@@ -56,7 +56,7 @@ worldvect <- world(path=tempdir())
 namap <- subset(worldvect, worldvect$NAME_0 == "United States" | worldvect$NAME_0 == "Canada" | worldvect$NAME_0 == "Mexico")
 plot(namap)
 namap1 = crop(namap, c(-180, -25, 0, 100))
-namap1 =project (namap1, "ESRI:102008")
+namap1 = project (namap1, "ESRI:102008")
 bb=ext(namap1)
 xmin(bb)=-5e6
 namap1=crop(namap1, bb)
@@ -68,13 +68,14 @@ points(tw.sp)
 #Get precipitation grids 
 prpiso = getIsoscapes("GlobalPrecipMA")
 prpiso1 = crop(prpiso, c( -180, -25, 0, 83.58326))
-prpiso1=project(prpiso1, namap1)
-prpiso1 = crop(prpiso1, namap1)
+prpiso3 = project(prpiso1, "ESRI:102008")
+prpiso4 = crop(prpiso3, namap1)
+prpiso2 =terra::mask(prpiso4, namap1)
 
-
+plot(prpiso2)
 ## Extract values to calculate residuals
-tw.sp$d2Hpcp = extract(prpiso1$d2h_MA, tw.sp, ID = FALSE)
-tw.sp$d18Opcp = extract(prpiso1$d18o_MA, tw.sp, ID = FALSE)
+tw.sp$d2Hpcp = extract(prpiso2$d2h_MA, tw.sp, ID = FALSE)
+tw.sp$d18Opcp = extract(prpiso2$d18o_MA, tw.sp, ID = FALSE)
 
 ## Look at results-  
 plot(tw.sp$d2Hpcp, tw.sp$d2H)
@@ -86,7 +87,7 @@ abline(0, 1)
 tw.sp$d2Hres = tw.sp$d2H - tw.sp$d2Hpcp
 tw.sp$d18Ores = tw.sp$d18O - tw.sp$d18Opcp
 
-## Variograms- this seems to be the problem area?
+## Variograms-
 hsub = data.frame(geom(tw.sp[!is.na(tw.sp$d2Hres),])[, 3:4])
 hsub = cbind(hsub, values(tw.sp[!is.na(tw.sp$d2Hres),]))
 hvar = variogram(d2Hres ~ 1, ~x+y, hsub, cutoff = 3e6,
@@ -113,7 +114,7 @@ ovgm.f = fit.variogram(ovar, ovgm, fit.method = 6)
 plot(ovar, ovgm.f)
 
 ## Prediction grid 25 km x 25 km- can increase later?
-pgg = aggregate(prpiso1$d2h_MA, 25)
+pgg = aggregate(prpiso2$d2h_MA, 25)
 
 ## Krige
 kh = gstat(formula = d2Hres ~ 1, locations = ~x + y, data = hsub, model = hvgm.f)
@@ -125,16 +126,16 @@ po = interpolate(pgg, ko)
 plot(po)
 
 ## Downscale
-ph = resample(ph, prpiso1)
-po = resample(po, prpiso1)
+ph = resample(ph, prpiso2)
+po = resample(po, prpiso2)
 
 ## Mask
-ph = mask(ph, prpiso1$d2h_MA)
-po = mask(po, prpiso1$d18o_MA)
+ph = mask(ph, prpiso2$d2h_MA)
+po = mask(po, prpiso2$d18o_MA)
 
 ## Sum isoscape and interpolated residuals
-htap = prpiso1$d2h_MA + ph$var1.pred
-otap = prpiso1$d18o_MA + po$var1.pred
+htap = prpiso2$d2h_MA + ph$var1.pred
+otap = prpiso2$d18o_MA + po$var1.pred
 
 # Uncertainty ----
 ## Tap isoscape residuals 
@@ -158,5 +159,5 @@ NAtap = c(htap, sqrt(ph$var1.var), htap.sd,
 names(NAtap) = c("d2h.m", "d2h.se", "d2h.sd", "d18o.m", "d18o.se", "d18o.sd")
 
 #Write out
-writeRaster(NAtap, "out/NAtap.tif")
+writeRaster(NAtap, "out/NAtap.tif", overwrite=TRUE)
 
