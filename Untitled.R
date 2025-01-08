@@ -51,6 +51,39 @@ points(tw.sp)
 iso = getIsoscapes("USPrecipMA")
 states.proj = project(states, iso)
 
+##Map of NorthAmerica
+worldvect <- world(path=tempdir())
+usmap <- subset(worldvect, worldvect$NAME_0 == "United States")
+plot(usmap)
+usmap1 = crop(namap, c(-125, -24, 66, 50))
+usmap1 = project (namap1, "ESRI:102008")
+bb=ext(namap1)
+xmin(bb)=-5e6
+namap1=crop(namap1, bb)
+tw.sp =project(tw.sp, namap1)
+plot(usmap1)
+points(tw.sp)
+library(sf)
+
+# Load the world shapefile
+worldvect <- st_read(system.file("shape/world", package = "maptools"))
+
+# Subset to get the shapefile for the United States
+usmap <- subset(worldvect, ADMIN == "United States")
+
+# Plot the shapefile for the United States
+plot(usmap)
+
+# Crop to the contiguous United States
+usmap1 <- st_crop(usmap, xmin = -125, ymin = 24, xmax = -66, ymax = 50)
+
+# Project to an appropriate coordinate system (e.g., USA Contiguous Albers Equal Area Conic)
+usmap1 <- st_transform(usmap1, crs = st_crs(usmap1)$USA_Contiguous_Albers_Equal_Area_Conic)
+
+# Plot the cropped and projected shapefile
+plot(usmap1)
+
+
 ## Project and spatial subset data
 tw.sp = project(tw.sp, iso)
 tw.sp = tw.sp[states.proj,]
